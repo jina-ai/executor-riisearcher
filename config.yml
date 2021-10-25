@@ -2,3 +2,5 @@ jtype: RiiSearcher
 metas:
   py_modules:
     - executor.py
+  workspace: workspace/
+  name: rii_searcher
