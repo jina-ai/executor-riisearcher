@@ -11,17 +11,14 @@ Check [tests](tests) for an example on how to use it.
 
 ## Index and search
 
-This example shows a common usage pattern where we first index some documents, and then
-perform search on the index. 
+This example shows a common usage pattern where we first train and index some documents, and then
+perform search on the indexed data.
 
 Note that to achieve the desired trade-off between index and query
 time on one hand, and search accuracy on the other, you will need to "finetune" the
 index parameters. For more information on that, see [rii documentation](https://rii.readthedocs.io/en/latest/source/tips.html).
 
-
-### Training
-
-To use a trainable Rii indexer we can first train the indexer with the data from `train_data_file`:
+To use a trainable Rii indexer we can first train the indexer and then make a search
 
 ```python
 import numpy as np
@@ -34,40 +31,50 @@ def _get_docs_from_vecs(queries):
         docs.append(doc)
     return docs
 
-train_data_file = 'train.npy'
-train_data = np.array(np.random.random([10240, 256]), dtype=np.float32)
-np.save(train_data_file, train_data)
-
 index = np.array(np.random.random([1000, 10]), dtype=np.float32)
 index_docs = _get_docs_from_vecs(index)
 
-f = Flow().add(
-    uses='jinahub://RiiSearcher',
-    timeout_ready=-1,
-)
-
-with f:
-    f.post(on='/train', parameters={'train_data_file': train_data_file})
-    f.post(on='/index', inputs=index_docs)
-    # the trained index will be dumped to "rii.pkl" at the `index_path`
-    f.post(on='/dump', parameters={'index_path': '.'})
-```
-
-Then, we can directly use the trained indexer with providing `index_path` and search:
-
-```python
 query = np.array(np.random.random([10, 10]), dtype=np.float32)
 query_docs = _get_docs_from_vecs(query)
+
 f = Flow().add(
-    uses='jinahub://RiiSearcher',
+    uses='jinahub+docker://RiiSearcher',
     timeout_ready=-1,
-    uses_with={
-      'index_path': '/path/to/index_file'
-    },
 )
 
 with f:
-    result = f.post(
-        on='/search', data=query_docs, return_results=True, parameters={'top_k': 4}
-    )
+    f.post(on='/train', inputs=index_docs)
+    
+    # Now search for some data
+    f.post(on='/search', data=query_docs, parameters={'top_k': 4})
+```
+
+
+## Save and load
+
+We can also save the trained RiiSearcher with the indexed data. This example shows the how to save and then re-create the executor based on the saved index.
+
+```python
+f = Flow().add(
+    uses='jinahub+docker://RiiSearcher',
+    timeout_ready=-1,
+)
+
+with f:
+    # Train and index data
+    f.post(on='/train', inputs=index_docs)
+    
+    # Now save the trained indexer
+    f.post(on='/save', parameters={'dump_path': '.'})
+
+# Create a new flow to load the pre-trained indexer on start
+f = Flow().add(
+    uses='jinahub+docker://RiiSearcher',
+    uses_with={'dump_path', '.'},
+    timeout_ready=-1
+)
+
+with f:
+    # Now make a direct search
+    f.post(on='/search', data=query_docs, parameters={'top_k': 4})
 ```
