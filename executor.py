@@ -16,6 +16,12 @@ RII_INDEX_FILENAME = "rii.pkl"
 
 
 class RiiSearcher(Executor):
+    """
+    Rii-powered vector indexer and searcher
+    or more information about the Rii
+    supported parameters and installation problems, please consult:
+        - https://github.com/matsui528/rii
+    """
     def __init__(
         self,
         Ks: Optional[int] = 1,
@@ -24,6 +30,7 @@ class RiiSearcher(Executor):
         nlist: Optional[int] = None,
         iter_steps: Optional[iter] = 5,
         max_num_training_points: Optional[int] = None,
+        index_path: Optional[str] = None,
         dump_path: Optional[str] = None,
         prefetch_size: Optional[int] = 512,
         traversal_paths: List[str] = ['r'],
@@ -43,6 +50,8 @@ class RiiSearcher(Executor):
         :param nlist: The number of cluster centers. The default value is `None`, where `nlist`
                 is set to `sqrt(N)` automatically with N being the number of index data
         :param iter_steps: The number of iteration for pqk-means to update cluster centers
+        :param dump_path: the path to load ids and vecs
+        :param index_path: the path to load the trained index file if no `dump_path`
         :param max_num_training_points: Optional argument to consider only a subset of
         training points to training data from `train_filepath`.
             The points will be selected randomly from the available points
@@ -89,7 +98,7 @@ class RiiSearcher(Executor):
             self.logger.info(
                 'No `dump_path` provided, attempting to load pre-trained indexer.'
             )
-            self._load(self.workspace)
+            self._load(index_path)
 
     def _load_dump(self, dump_path, **kwargs):
         if dump_path is not None:
@@ -189,6 +198,16 @@ class RiiSearcher(Executor):
 
     @requests(on="/train")
     def train(self, parameters: Dict, **kwargs):
+        """
+        Train the nanopq codec for Rii initialisation. Currently it accepts .npq file
+        which contains the embedding vectors with the same distribution as the data to be indexed
+
+        :param parameters: Dictionary with optional parameters that can be used to
+            override the parameters set at initialization. The only supported key is
+            `train_data_file`, and `max_num_training_points`.
+        :param kwargs:
+        :return:
+        """
         train_data_file = parameters.get("train_data_file")
         if train_data_file is None:
             raise ValueError(f'No "train_data_file" provided for training {self}')
@@ -282,8 +301,17 @@ class RiiSearcher(Executor):
         *args,
         **kwargs,
     ):
-        """Given a query vector, run the approximate nearest neighbor search over the stored PQ-codes.
-        This functions returns the identifiers and the distances of ``topk`` nearest PQ-codes to the query.
+        """Given the query document, run the approximate nearest neighbor search
+        over the stored PQ-codes. This functions matches the identifiers and the
+         distances of ``topk`` nearest PQ-codes to the query.
+        Attach matches to the Documents in `docs`, each match containing only the
+        `id` of the matched document and the `score`.
+
+        :param docs: An array of `Documents` that should have the `embedding` property
+            of the same dimension as vectors in the index
+        :param parameters: Dictionary with optional parameters that can be used to
+            override the parameters set at initialization. Supported keys are
+            `traversal_paths`, `top_k` and `target_ids`.
         """
         if docs is None:
             return
@@ -295,6 +323,7 @@ class RiiSearcher(Executor):
             parameters = {}
 
         traversal_paths = parameters.get("traversal_paths", self.traversal_paths)
+        target_ids = parameters.get("target_ids", None)
         top_k = int(parameters.get("top_k", self.default_top_k))
         L = parameters.get("L", self.L)
 
@@ -303,6 +332,7 @@ class RiiSearcher(Executor):
                 q=doc.embedding,
                 L=L,
                 topk=top_k,
+                target_ids=target_ids,
             )
             for idx, dist in zip(indices, dists):
                 match = Document(
@@ -341,7 +371,7 @@ class RiiSearcher(Executor):
         """
 
         target_path = (
-            parameters['target_path'] if 'target_path' in parameters else self.workspace
+            parameters['index_path'] if 'index_path' in parameters else self.workspace
         )
 
         os.makedirs(target_path, exist_ok=True)

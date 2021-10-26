@@ -34,6 +34,9 @@ def test_train_and_index(metas, tmpdir):
     vec_idx = np.random.randint(0, high=512, size=[512]).astype(str)
     vec = np.array(np.random.random([512, 10]), dtype=np.float32)
 
+    index = np.array(np.random.random([1000, 10]), dtype=np.float32)
+    index_docs = _get_docs_from_vecs(index)
+
     query = np.array(np.random.random([10, 10]), dtype=np.float32)
     query_docs = _get_docs_from_vecs(query)
 
@@ -47,7 +50,7 @@ def test_train_and_index(metas, tmpdir):
         len(vec_idx),
         zip(vec_idx, vec, [b'' for _ in range(len(vec))]),
     )
-    dump_path = os.path.join(tmpdir, 'dump')
+    index_path = os.path.join(tmpdir, 'index_dump')
 
     f = Flow().add(
         uses=RiiSearcher,
@@ -55,11 +58,11 @@ def test_train_and_index(metas, tmpdir):
     )
     with f:
         f.post(on='/train', parameters={'train_data_file': train_data_file})
+        f.post(on='/index', inputs=index_docs)
         f.post(
             on='/dump',
-            target_peapod='rii',
             parameters={
-                'target_path': str(dump_path),
+                'index_path': str(index_path),
             },
         )
 
@@ -67,7 +70,7 @@ def test_train_and_index(metas, tmpdir):
         uses=RiiSearcher,
         timeout_ready=-1,
         uses_with={
-            'dump_path': dump_path,
+            'index_path': index_path,
         },
     )
     with f:
