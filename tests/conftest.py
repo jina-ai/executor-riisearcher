@@ -21,7 +21,7 @@ def rii_index():
 def trained_index(tmp_path):
     vec = np.array(np.random.random([512, 10]), dtype=np.float32)
     index = RiiSearcher()
-    index.train(vec, parameters={'dump_path': tmp_path})
+    index.train(vec, parameters={'model_path': tmp_path})
     return index
 
 

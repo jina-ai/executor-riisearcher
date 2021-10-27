@@ -28,7 +28,7 @@ def test_search_flow(tmp_path, saved_rii):
 
     f = Flow().add(
         uses=RiiSearcher,
-        uses_with={'dump_path': str(tmp_path)},
+        uses_with={'model_path': str(tmp_path)},
         timeout_ready=-1,
     )
     with f:
@@ -48,19 +48,13 @@ def test_search_flow(tmp_path, saved_rii):
 
 
 def test_save_load(tmp_path, saved_rii):
-    da = DocumentArray(
-        [Document(embedding=np.random.random(_DIM)) for _ in range(1024)]
-    )
-    vec = np.array(np.random.random([512, 10]), dtype=np.float32)
-    query_docs = _get_docs_from_vecs(vec)
-
     f = Flow().add(
         name='rii',
         uses=RiiSearcher,
-        uses_with={'dump_path': str(tmp_path)},
+        uses_with={'model_path': str(tmp_path)},
         timeout_ready=-1,
     )
     with f:
-        f.post(on='/save', target_peapod='rii', parameters={'dump_path': str(tmp_path)})
+        f.post(on='/save', target_peapod='rii', parameters={'model_path': str(tmp_path)})
         assert (tmp_path / DOC_IDS_FILENAME).is_file()
         assert (tmp_path / RII_INDEX_FILENAME).is_file()

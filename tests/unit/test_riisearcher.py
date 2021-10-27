@@ -55,7 +55,7 @@ def test_train(tmp_path, rii_index):
     rii_index.train(
         vec,
         parameters={
-            'dump_path': tmp_path,
+            'model_path': tmp_path,
         },
     )
     assert (tmp_path / RII_INDEX_FILENAME).is_file()
@@ -65,20 +65,20 @@ def test_train_and_index(tmp_path):
     # First train the indexer and save it
     vec = np.array(np.random.random([512, 10]), dtype=np.float32)
     index = RiiSearcher()
-    index.train(vec, parameters={'dump_path': tmp_path})
+    index.train(vec, parameters={'model_path': tmp_path})
 
     # Load the pre-trained and index data
     da_index = DocumentArray(
         [Document(embedding=np.random.random(_DIM)) for _ in range(1024)]
     )
-    rii_index = RiiSearcher(dump_path=str(tmp_path))
+    rii_index = RiiSearcher(model_path=str(tmp_path))
     rii_index.index(da_index, {})
     assert len(rii_index._doc_ids) == 1024
     assert rii_index._rii_index.N == 1024
 
 
 def test_rii_search(trained_index, tmp_path):
-    indexer = RiiSearcher(dump_path=str(tmp_path))
+    indexer = RiiSearcher(model_path=str(tmp_path))
     vec = np.array(np.random.random([1024, 10]), dtype=np.float32)
     index_docs = _get_docs_from_vecs(vec)
     indexer.index(index_docs)
@@ -95,9 +95,9 @@ def test_save(trained_index, tmp_path):
     da = DocumentArray(
         [Document(embedding=np.random.random(_DIM)) for _ in range(1024)]
     )
-    rii_index = RiiSearcher(dump_path=str(tmp_path))
+    rii_index = RiiSearcher(model_path=str(tmp_path))
     rii_index.index(da, {})
-    rii_index.save(parameters={'dump_path': str(tmp_path)})
+    rii_index.save(parameters={'model_path': str(tmp_path)})
 
     assert (tmp_path / DOC_IDS_FILENAME).is_file()
     assert (tmp_path / RII_INDEX_FILENAME).is_file()

@@ -29,7 +29,7 @@ class RiiSearcher(Executor):
         iter_steps: int = 5,
         default_top_k: int = 5,
         max_num_training_points: Optional[int] = None,
-        dump_path: Optional[str] = None,
+        model_path: Optional[str] = None,
         traversal_paths: Tuple[str] = ('r',),
         is_verbose: bool = False,
         *args,
@@ -37,7 +37,7 @@ class RiiSearcher(Executor):
     ):
         """
         :param codewords: Number of codewords associated with each `D/M` subspace where D is the
-                dimension of embedding array. Typically 256.
+                dimension of embedding array.
         :param candidates: The number of PQ-codes for the candidates of distance evaluation.
                 With a higher ``L`` value, the accuracy is boosted but the runtime gets slower.
         :param subspaces: The number of subspaces for PQ/OPQ, which is basically the number of units
@@ -46,7 +46,7 @@ class RiiSearcher(Executor):
         :param cluster_center: The number of cluster centers. The default value is `None`, where
                 `cluster_center` is set to `sqrt(N)` automatically with N being the number of index data
         :param iter_steps: The number of iteration for pqk-means to update cluster centers
-        :param dump_path: the path to load the trained index file and ids
+        :param model_path: the path to load the trained index file and ids
         :param max_num_training_points: Optional argument to consider only a subset of
         training points to training data from `train_filepath`.
             The points will be selected randomly from the available points
@@ -68,11 +68,11 @@ class RiiSearcher(Executor):
             self.logger.warning(
                 "Ks must be less than 256 so that each code must be uint8"
             )
-        self.codewords = num_codeword  # Ks
-        self.candidates = num_candidates  # L
+        self.codewords = num_codeword
+        self.candidates = num_candidates
         self.is_verbose = is_verbose
         self._doc_ids = []
-        self.dump_path = dump_path
+        self.model_path = model_path
         self._is_trained = False
         self.default_top_k = default_top_k
         self.traversal_paths = traversal_paths
@@ -80,24 +80,24 @@ class RiiSearcher(Executor):
         self.codec = nanopq.PQ(
             M=self.subspaces, Ks=self.codewords, verbose=self.is_verbose
         )
-        dump_path = self.dump_path or kwargs.get('runtime_args', {}).get(
-            'dump_path', None
+        model_path = self.model_path or kwargs.get('runtime_args', {}).get(
+            'model_path', None
         )
-        if dump_path:
-            self.logger.info(f'Building RiiSearcher from dump data {dump_path}')
+        if model_path:
+            self.logger.info(f'Building RiiSearcher from dump data {model_path}')
             try:
-                with open(os.path.join(dump_path, RII_INDEX_FILENAME), "rb") as f:
+                with open(os.path.join(model_path, RII_INDEX_FILENAME), "rb") as f:
                     self._rii_index = pickle.load(f)
                     self._rii_index.verbose = self.is_verbose
                     self._is_trained = True
             except FileNotFoundError:
                 self.logger.info(
                     'No snapshot of Rii indexer found, '
-                    'you should train and build the indexer from scratch!!'
+                    'you should train offline and build the indexer again!!'
                 )
         else:
             self.logger.info(
-                'No `dump_path` provided, train and build the indexer from scratch!!.'
+                'No `model_path` provided, train offline and build the indexer from scratch!!.'
             )
 
     def _add_to_index(
@@ -122,7 +122,7 @@ class RiiSearcher(Executor):
         :param data: A numpy array with data to train
         :param parameters: Dictionary with optional parameters to override
         default parameters set at initialization. The only supported key is
-            `dump_path`, `code_words`, `sub_spaces`, and `dump_path`.
+            `model_path`, `code_words`, `sub_spaces`, and `model_path`.
         """
         if data is None or len(data) == 0:
             self.logger.warning('Please pass data for training')
@@ -130,7 +130,7 @@ class RiiSearcher(Executor):
 
         codewords = parameters.get('code_words', self.codewords)
         subspaces = parameters.get('sub_spaces', self.subspaces)
-        dump_path = parameters.get('dump_path', self.dump_path)
+        model_path = parameters.get('model_path', self.model_path)
 
         num_samples, _ = data.shape
         self.logger.info(f'Training nanopq codec with {num_samples} points')
@@ -139,8 +139,8 @@ class RiiSearcher(Executor):
         codec.fit(vecs=data)
         rii_index = rii.Rii(fine_quantizer=codec)
 
-        self.logger.info(f"Dumping the RiiSearcher to {dump_path}")
-        with open(os.path.join(dump_path, RII_INDEX_FILENAME), 'wb') as f:
+        self.logger.info(f"Dumping the RiiSearcher to {model_path}")
+        with open(os.path.join(model_path, RII_INDEX_FILENAME), 'wb') as f:
             pickle.dump(rii_index, f)
 
     @requests(on='/index')
@@ -181,7 +181,7 @@ class RiiSearcher(Executor):
             of the same dimension as vectors in the index
         :param parameters: Dictionary with optional parameters that can be used to
             override the parameters set at initialization. Supported keys are
-            `traversal_paths`, `top_k`, `L`, and `target_ids`.
+            `traversal_paths`, `top_k`, `candidates`, and `target_ids`.
         """
         if not hasattr(self, '_rii_index'):
             self.logger.warning("Querying against an empty index")
@@ -193,12 +193,12 @@ class RiiSearcher(Executor):
         traversal_paths = parameters.get("traversal_paths", self.traversal_paths)
         target_ids = parameters.get("target_ids", None)
         top_k = int(parameters.get("top_k", self.default_top_k))
-        L = parameters.get("L", self.candidates)
+        candidates = parameters.get("candidates", self.candidates)
 
         for doc in docs.traverse_flat(traversal_paths):
             indices, dists = self._rii_index.query(
                 q=doc.embedding,
-                L=L,
+                L=candidates,
                 topk=top_k,
                 target_ids=target_ids,
             )
@@ -214,20 +214,20 @@ class RiiSearcher(Executor):
 
         :param parameters: Dictionary with optional parameters to override
         default parameters set at initialization. The only supported key is
-            `dump_path`.
+            `model_path`.
         """
 
-        dump_path = parameters.get('dump_path', self.dump_path)
-        if dump_path is None:
+        model_path = parameters.get('model_path', self.model_path)
+        if model_path is None:
             raise ValueError(
-                'The `dump_path` must be provided to save the indexer state.'
+                'The `model_path` must be provided to save the indexer state.'
             )
 
-        os.makedirs(dump_path, exist_ok=True)
+        os.makedirs(model_path, exist_ok=True)
 
-        self.logger.info(f"Dumping the RiiSearcher to {dump_path}")
-        with open(os.path.join(dump_path, RII_INDEX_FILENAME), 'wb') as f:
+        self.logger.info(f"Dumping the RiiSearcher to {model_path}")
+        with open(os.path.join(model_path, RII_INDEX_FILENAME), 'wb') as f:
             pickle.dump(self._rii_index, f)
 
-        with open(os.path.join(dump_path, DOC_IDS_FILENAME), "wb") as fp:
+        with open(os.path.join(model_path, DOC_IDS_FILENAME), "wb") as fp:
             pickle.dump(self._doc_ids, fp)
