@@ -18,6 +18,14 @@ def rii_index():
 
 
 @pytest.fixture(scope='function')
+def trained_index(tmp_path):
+    vec = np.array(np.random.random([512, 10]), dtype=np.float32)
+    index = RiiSearcher()
+    index.train(vec, parameters={'dump_path': tmp_path})
+    return index
+
+
+@pytest.fixture(scope='function')
 def saved_rii(tmpdir):
     trained_index_file = os.path.join(tmpdir, RII_INDEX_FILENAME)
     train_ids_file = os.path.join(tmpdir, DOC_IDS_FILENAME)

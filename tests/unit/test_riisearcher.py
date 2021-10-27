@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 
 import numpy as np
-import pytest
 from jina import Document, DocumentArray, Executor
 
 from executor import RiiSearcher
@@ -51,65 +50,53 @@ def test_search_input_none(rii_index):
     rii_index.search(None)
 
 
-def test_saved_rii_indexer(saved_rii, tmpdir):
-    query = np.array(np.random.random([10, 10]), dtype=np.float32)
-    query_docs = _get_docs_from_vecs(query)
-    indexer = RiiSearcher(
-        dump_path=tmpdir,
-        runtime_args={'pea_id': 0},
-    )
-    indexer.search(query_docs, parameters={'top_k': 4})
-    assert len(query_docs[0].matches) == 4
-    for d in query_docs:
-        assert (
-            d.matches[0].scores[indexer.metric].value
-            <= d.matches[1].scores[indexer.metric].value
-        )
-
-
-@pytest.mark.parametrize('max_num_points', [257, 500, None])
-def test_train(tmpdir, max_num_points, rii_index):
-    da = DocumentArray(
-        [Document(embedding=np.random.random(_DIM)) for _ in range(1024)]
-    )
+def test_train(tmp_path, rii_index):
+    vec = np.array(np.random.random([512, 10]), dtype=np.float32)
     rii_index.train(
-        da,
+        vec,
         parameters={
-            'max_num_training_points': max_num_points,
+            'dump_path': tmp_path,
         },
     )
-    assert rii_index._is_trained
+    assert (tmp_path / RII_INDEX_FILENAME).is_file()
+
+
+def test_train_and_index(tmp_path):
+    # First train the indexer and save it
+    vec = np.array(np.random.random([512, 10]), dtype=np.float32)
+    index = RiiSearcher()
+    index.train(vec, parameters={'dump_path': tmp_path})
+
+    # Load the pre-trained and index data
+    da_index = DocumentArray(
+        [Document(embedding=np.random.random(_DIM)) for _ in range(1024)]
+    )
+    rii_index = RiiSearcher(dump_path=str(tmp_path))
+    rii_index.index(da_index, {})
+    assert len(rii_index._doc_ids) == 1024
     assert rii_index._rii_index.N == 1024
 
 
-def test_train_and_index(rii_index):
-    NUM_DOCS = 1000
-    da_train = DocumentArray(
-        [Document(embedding=np.random.random(_DIM)) for _ in range(NUM_DOCS)]
-    )
-    da_index = DocumentArray(
-        [Document(embedding=np.random.random(_DIM)) for _ in range(NUM_DOCS)]
-    )
-    rii_index.train(da_train)
-    rii_index.index(da_index, {})
-    assert len(rii_index._doc_ids) == 2 * NUM_DOCS
-    assert rii_index._rii_index.N == 2 * NUM_DOCS
+def test_rii_search(trained_index, tmp_path):
+    indexer = RiiSearcher(dump_path=str(tmp_path))
+    vec = np.array(np.random.random([1024, 10]), dtype=np.float32)
+    index_docs = _get_docs_from_vecs(vec)
+    indexer.index(index_docs)
 
-
-def test_rii_search(saved_rii, tmpdir):
-    indexer = RiiSearcher(dump_path=tmpdir)
-    vec = np.array(np.random.random([512, 10]), dtype=np.float32)
+    vec = np.array(np.random.random([10, 10]), dtype=np.float32)
     query_docs = _get_docs_from_vecs(vec)
     indexer.search(query_docs)
+
     for q in query_docs:
         np.testing.assert_array_less(q.matches[0].scores['euclidean'].value, 10)
 
 
-def test_save(tmp_path, rii_index):
+def test_save(trained_index, tmp_path):
     da = DocumentArray(
         [Document(embedding=np.random.random(_DIM)) for _ in range(1024)]
     )
-    rii_index.train(da)
+    rii_index = RiiSearcher(dump_path=str(tmp_path))
+    rii_index.index(da, {})
     rii_index.save(parameters={'dump_path': str(tmp_path)})
 
     assert (tmp_path / DOC_IDS_FILENAME).is_file()
