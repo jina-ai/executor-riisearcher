@@ -31,8 +31,8 @@ def saved_rii(tmpdir):
     train_ids_file = os.path.join(tmpdir, DOC_IDS_FILENAME)
     train_data = np.array(np.random.random([1024, 10]), dtype=np.float32)
     ids = [idx for idx in range(1024)]
-    codec = nanopq.PQ(M=1, Ks=1, verbose=True).fit(vecs=train_data)
-    e = rii.Rii(fine_quantizer=codec).add_configure(train_data)
+    codec = nanopq.PQ(M=1, Ks=1, verbose=False).fit(vecs=train_data)
+    e = rii.Rii(fine_quantizer=codec)
     with open(trained_index_file, 'wb') as f:
         pickle.dump(e, f)
     with open(train_ids_file, 'wb') as f:

@@ -43,8 +43,8 @@ class RiiSearcher(Executor):
         :param subspaces: The number of subspaces for PQ/OPQ, which is basically the number of units
                 into which the embeddings will be broken down to. It controls the runtime
                 accuracy and memory consumptions
-        :param cluster_center: The number of cluster centers. The default value is `None`, where `nlist`
-                is set to `sqrt(N)` automatically with N being the number of index data
+        :param cluster_center: The number of cluster centers. The default value is `None`, where
+                `cluster_center` is set to `sqrt(N)` automatically with N being the number of index data
         :param iter_steps: The number of iteration for pqk-means to update cluster centers
         :param dump_path: the path to load the trained index file and ids
         :param max_num_training_points: Optional argument to consider only a subset of
@@ -107,7 +107,7 @@ class RiiSearcher(Executor):
             self.logger.warning('Please train the indexer first before indexing data')
             return
 
-        self.logger.info('Building the Rii indexer...')
+        self.logger.info(f'Adding the indexing data of size {vectors.shape[0]}')
         self._rii_index.add_configure(vecs=vectors, nlist=cluster_center, iter=iter)
         self._doc_ids.extend(ids)
 
