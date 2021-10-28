@@ -1,6 +1,6 @@
 import os
 import pickle
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 
 import nanopq
 import numpy as np
@@ -36,11 +36,11 @@ class RiiSearcher(Executor):
         **kwargs,
     ):
         """
-        :param codewords: Number of codewords associated with each `D/M` subspace where D is the
+        :param num_codeword: Number of codewords associated with each `D/M` subspace where D is the
                 dimension of embedding array.
-        :param candidates: The number of PQ-codes for the candidates of distance evaluation.
+        :param num_candidates: The number of PQ-codes for the candidates of distance evaluation.
                 With a higher ``L`` value, the accuracy is boosted but the runtime gets slower.
-        :param subspaces: The number of subspaces for PQ/OPQ, which is basically the number of units
+        :param num_subspaces: The number of subspaces for PQ/OPQ, which is basically the number of units
                 into which the embeddings will be broken down to. It controls the runtime
                 accuracy and memory consumptions
         :param cluster_center: The number of cluster centers. The default value is `None`, where
@@ -66,8 +66,10 @@ class RiiSearcher(Executor):
         self.subspaces = num_subspaces
         if num_codeword and num_codeword > 256:
             self.logger.warning(
-                "Ks must be less than 256 so that each code must be uint8"
+                'Ks is greater than 256. Setting it to 256'
+                ' so that each code must be uint8'
             )
+            num_codeword = 256
         self.codewords = num_codeword
         self.candidates = num_candidates
         self.is_verbose = is_verbose
@@ -93,15 +95,15 @@ class RiiSearcher(Executor):
             except FileNotFoundError:
                 self.logger.info(
                     'No snapshot of Rii indexer found, '
-                    'you should train offline and build the indexer again!!'
+                    'you should train offline and build the indexer again!'
                 )
         else:
             self.logger.info(
-                'No `model_path` provided, train offline and build the indexer from scratch!!.'
+                'No `model_path` provided, train offline and build the indexer from scratch!'
             )
 
     def _add_to_index(
-        self, vectors: "np.ndarray", ids: list, cluster_center: int, iter: int
+        self, vectors: "np.ndarray", ids: List, cluster_center: int, iter: int
     ):
         if self._rii_index is None or not self._is_trained:
             self.logger.warning('Please train the indexer first before indexing data')
