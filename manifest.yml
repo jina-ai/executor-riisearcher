@@ -1,2 +1,5 @@
 manifest_version: 1
 name: RiiSearcher
+description: Rii powered vector searcher
+url: https://github.com/jina-ai/executor-riisearcher
+keywords: [indexer, rii, ann, searcher, Executor, vector]
