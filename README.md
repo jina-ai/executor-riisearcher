@@ -22,6 +22,10 @@ To use a trainable Rii indexer we can first train the indexer and then make a se
 
 ```python
 import numpy as np
+import os
+import rii
+import nanopq
+import pickle
 from jina import Flow, Document, DocumentArray
 
 def _get_docs_from_vecs(queries):
@@ -31,20 +35,33 @@ def _get_docs_from_vecs(queries):
         docs.append(doc)
     return docs
 
+# First save the trained instance of RiiSearcher with the help
+# of the helper function `train`
+
+trained_index_file = os.path.join('.', 'rii.pkl')
+train_data = np.array(np.random.random([1024, 10]), dtype=np.float32)
+codec = nanopq.PQ(M=1, Ks=1, verbose=False).fit(vecs=train_data)
+e = rii.Rii(fine_quantizer=codec) # create an instance of Rii using nanopq codec
+with open(trained_index_file, 'wb') as f:
+    pickle.dump(e, f)
+
+
+# Now lets start using the trained Rii in the flow to directly index and search
 index = np.array(np.random.random([1000, 10]), dtype=np.float32)
 index_docs = _get_docs_from_vecs(index)
 
 query = np.array(np.random.random([10, 10]), dtype=np.float32)
 query_docs = _get_docs_from_vecs(query)
 
+
 f = Flow().add(
     uses='jinahub+docker://RiiSearcher',
+    uses_with={'model_path', 'path/to/rii.pkl'},
     timeout_ready=-1,
 )
 
 with f:
-    f.post(on='/train', inputs=index_docs)
-    
+    f.post(on='/index', inputs=index_docs)
     # Now search for some data
     f.post(on='/search', data=query_docs, parameters={'top_k': 4})
 ```
@@ -65,12 +82,12 @@ with f:
     f.post(on='/train', inputs=index_docs)
     
     # Now save the trained indexer
-    f.post(on='/save', parameters={'dump_path': '.'})
+    f.post(on='/save', parameters={'model_path': '.'})
 
 # Create a new flow to load the pre-trained indexer on start
 f = Flow().add(
     uses='jinahub+docker://RiiSearcher',
-    uses_with={'dump_path', '.'},
+    uses_with={'model_path', '.'},
     timeout_ready=-1
 )
 
