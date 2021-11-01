@@ -22,13 +22,12 @@ class RiiSearcher(Executor):
 
     def __init__(
         self,
-        num_codeword: int = 1,
-        num_candidates: int = 10,
-        num_subspaces: int = 1,
+        codewords: int = 1,
+        candidates: int = 10,
+        subspaces: int = 1,
         cluster_center: Optional[int] = None,
         iter_steps: int = 5,
         default_top_k: int = 5,
-        max_num_training_points: Optional[int] = None,
         model_path: Optional[str] = None,
         traversal_paths: Tuple[str] = ('r',),
         is_verbose: bool = False,
@@ -36,18 +35,18 @@ class RiiSearcher(Executor):
         **kwargs,
     ):
         """
-        :param num_codeword: Number of codewords associated with each `D/M` subspace where D is the
+        :param codewords: Number of codewords associated with each `D/M` subspace where D is the
                 dimension of embedding array.
-        :param num_candidates: The number of PQ-codes for the candidates of distance evaluation.
+        :param candidates: The number of PQ-codes for the candidates of distance evaluation.
                 With a higher ``L`` value, the accuracy is boosted but the runtime gets slower.
-        :param num_subspaces: The number of subspaces for PQ/OPQ, which is basically the number of units
+        :param subspaces: The number of subspaces for PQ/OPQ, which is basically the number of units
                 into which the embeddings will be broken down to. It controls the runtime
                 accuracy and memory consumptions
         :param cluster_center: The number of cluster centers. The default value is `None`, where
                 `cluster_center` is set to `sqrt(N)` automatically with N being the number of index data
         :param iter_steps: The number of iteration for pqk-means to update cluster centers
-        :param model_path: the path to load the trained index file and ids
-        :param max_num_training_points: Optional argument to consider only a subset of
+        :param model_path: the path containing the trained index file. Trained index file should
+                be saved as `rii.pkl`.
         training points to training data from `train_filepath`.
             The points will be selected randomly from the available points
         :param traversal_paths: traverse path on docs, e.g. ['r'], ['c']
@@ -59,19 +58,18 @@ class RiiSearcher(Executor):
         self.logger = JinaLogger(
             getattr(self.metas, "name", self.__class__.__name__)
         ).logger
-        self.max_num_training_points = max_num_training_points
         self.cluster_center = cluster_center
         self.iter = iter_steps
         self.metric = 'euclidean'
-        self.subspaces = num_subspaces
-        if num_codeword and num_codeword > 256:
+        self.subspaces = subspaces
+        if codewords and codewords > 256:
             self.logger.warning(
                 'Ks is greater than 256. Setting it to 256'
                 ' so that each code must be uint8'
             )
-            num_codeword = 256
-        self.codewords = num_codeword
-        self.candidates = num_candidates
+            codewords = 256
+        self.codewords = codewords
+        self.candidates = candidates
         self.is_verbose = is_verbose
         self._doc_ids = []
         self.model_path = model_path
@@ -130,8 +128,8 @@ class RiiSearcher(Executor):
             self.logger.warning('Please pass data for training')
             return
 
-        codewords = parameters.get('code_words', self.codewords)
-        subspaces = parameters.get('sub_spaces', self.subspaces)
+        codewords = parameters.get('codewords', self.codewords)
+        subspaces = parameters.get('subspaces', self.subspaces)
         model_path = parameters.get('model_path', self.model_path)
 
         num_samples, _ = data.shape
