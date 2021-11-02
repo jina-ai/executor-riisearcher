@@ -84,7 +84,7 @@ class RiiSearcher(Executor):
             'model_path', None
         )
         if model_path:
-            self.logger.info(f'Building RiiSearcher from dump data {model_path}')
+            self.logger.info(f'Building RiiSearcher from model path: {model_path}')
             try:
                 with open(os.path.join(model_path, RII_INDEX_FILENAME), "rb") as f:
                     self._rii_index = pickle.load(f)
@@ -101,13 +101,13 @@ class RiiSearcher(Executor):
             )
 
     def _add_to_index(
-        self, vectors: "np.ndarray", ids: List, cluster_center: int, iter: int
-    ):
+        self, vectors: "np.ndarray", ids: List):
         if self._rii_index is None or not self._is_trained:
             self.logger.warning('Please train the indexer first before indexing data')
             return
 
-        self._rii_index.add_configure(vecs=vectors, nlist=cluster_center, iter=iter)
+        self._rii_index.add(vecs=vectors)
+        self._needs_reconfigure = True
         self._doc_ids.extend(ids)
 
     def train(self, data: 'np.ndarray', parameters: {}, *args, **kwargs) -> None:
@@ -155,18 +155,16 @@ class RiiSearcher(Executor):
         if len(flat_docs) == 0:
             return
 
-        cluster_center = parameters.get('cluster_center', self.cluster_center)
-        iter = parameters.get('iter', self.iter)
         ids = flat_docs.get_attributes('id')
         embeddings = np.stack(flat_docs.embeddings).astype(np.float32)
 
-        self._add_to_index(embeddings, ids, cluster_center, iter)
+        self._add_to_index(embeddings, ids)
 
     @requests(on="/search")
     def search(
         self,
         docs: DocumentArray,
-        parameters: Optional[Dict] = None,
+        parameters: Optional[Dict] = {},
         *args,
         **kwargs,
     ):
@@ -185,6 +183,11 @@ class RiiSearcher(Executor):
         if not hasattr(self, '_rii_index'):
             self.logger.warning("Querying against an empty index")
             return
+
+        if self._needs_reconfigure:
+            cluster_center = parameters.get('cluster_center', self.cluster_center)
+            iteration = parameters.get('iter', self.iter)
+            self._rii_index.reconfigure(nlist=cluster_center, iter=iteration)
 
         if parameters is None:
             parameters = {}
