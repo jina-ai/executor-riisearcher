@@ -90,6 +90,7 @@ class RiiSearcher(Executor):
                     self._rii_index = pickle.load(f)
                     self._rii_index.verbose = self.is_verbose
                     self._is_trained = True
+                    self._needs_reconfigure = True
             except FileNotFoundError:
                 self.logger.warning(
                     'No snapshot of Rii indexer found, '
