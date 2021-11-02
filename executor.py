@@ -26,7 +26,7 @@ class RiiSearcher(Executor):
         candidates: int = 10,
         subspaces: int = 1,
         cluster_center: Optional[int] = None,
-        iter_steps: int = 5,
+        iter: int = 5,
         default_top_k: int = 5,
         model_path: Optional[str] = None,
         traversal_paths: Tuple[str] = ('r',),
@@ -44,7 +44,7 @@ class RiiSearcher(Executor):
                 accuracy and memory consumptions
         :param cluster_center: The number of cluster centers. The default value is `None`, where
                 `cluster_center` is set to `sqrt(N)` automatically with N being the number of index data
-        :param iter_steps: The number of iteration for pqk-means to update cluster centers
+        :param iter: The number of iteration for pqk-means to update cluster centers
         :param model_path: the path containing the trained index file. Trained index file should
                 be saved as `rii.pkl`.
         training points to training data from `train_filepath`.
@@ -59,7 +59,7 @@ class RiiSearcher(Executor):
             getattr(self.metas, "name", self.__class__.__name__)
         ).logger
         self.cluster_center = cluster_center
-        self.iter = iter_steps
+        self.iter = iter
         self.metric = 'euclidean'
         self.subspaces = subspaces
         if codewords and codewords > 256:
@@ -91,12 +91,12 @@ class RiiSearcher(Executor):
                     self._rii_index.verbose = self.is_verbose
                     self._is_trained = True
             except FileNotFoundError:
-                self.logger.info(
+                self.logger.warning(
                     'No snapshot of Rii indexer found, '
                     'you should train offline and build the indexer again!'
                 )
         else:
-            self.logger.info(
+            self.logger.warning(
                 'No `model_path` provided, train offline and build the indexer from scratch!'
             )
 
@@ -107,7 +107,6 @@ class RiiSearcher(Executor):
             self.logger.warning('Please train the indexer first before indexing data')
             return
 
-        self.logger.info(f'Adding the indexing data of size {vectors.shape[0]}')
         self._rii_index.add_configure(vecs=vectors, nlist=cluster_center, iter=iter)
         self._doc_ids.extend(ids)
 
