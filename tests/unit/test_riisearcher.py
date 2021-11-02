@@ -88,7 +88,7 @@ def test_rii_search(trained_index, tmp_path):
     indexer.search(query_docs)
 
     for q in query_docs:
-        np.testing.assert_array_less(q.matches[0].scores['euclidean'].value, 10)
+        assert q.matches[0].scores['euclidean'].value < 10
 
 
 def test_save(trained_index, tmp_path):
@@ -119,4 +119,4 @@ def test_reconfigure(saved_rii, tmp_path):
     assert not rii_index._needs_reconfigure
 
     for q in query_docs:
-        np.testing.assert_array_less(q.matches[0].scores['euclidean'].value, 10)
+        assert q.matches[0].scores['euclidean'].value < 10
