@@ -88,7 +88,7 @@ def test_rii_search(trained_index, tmp_path):
     indexer.search(query_docs)
 
     for q in query_docs:
-        np.testing.assert_array_less(q.matches[0].scores['euclidean'].value, 10)
+        assert q.matches[0].scores['euclidean'].value < 10
 
 
 def test_save(trained_index, tmp_path):
@@ -101,3 +101,22 @@ def test_save(trained_index, tmp_path):
 
     assert (tmp_path / DOC_IDS_FILENAME).is_file()
     assert (tmp_path / RII_INDEX_FILENAME).is_file()
+
+
+def test_reconfigure(saved_rii, tmp_path):
+    da = DocumentArray(
+        [Document(embedding=np.random.random(_DIM)) for _ in range(1024)]
+    )
+    rii_index = RiiSearcher(model_path=str(tmp_path))
+    assert rii_index._needs_reconfigure
+
+    rii_index.index(da, {})
+    assert rii_index._needs_reconfigure
+
+    vec = np.array(np.random.random([10, 10]), dtype=np.float32)
+    query_docs = _get_docs_from_vecs(vec)
+    rii_index.search(query_docs)
+    assert not rii_index._needs_reconfigure
+
+    for q in query_docs:
+        assert q.matches[0].scores['euclidean'].value < 10
