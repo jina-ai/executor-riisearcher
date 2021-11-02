@@ -188,6 +188,7 @@ class RiiSearcher(Executor):
             cluster_center = parameters.get('cluster_center', self.cluster_center)
             iteration = parameters.get('iter', self.iter)
             self._rii_index.reconfigure(nlist=cluster_center, iter=iteration)
+            self._needs_reconfigure = False
 
         if parameters is None:
             parameters = {}
