@@ -5,7 +5,7 @@ It is a C++ library with Python bindings to search for points in space based on 
 
 For more information please refer to the Github [repo](https://github.com/matsui528/rii)
 
-**NOTE:** Since we do not reconfigure Rii during `/index` flow but during the `/search` flow, therefore the first search after a CUD operation will always be slower. 
+**NOTE:** Since we do not reconfigure Rii during `/index` request but during the `/search` request, therefore the first search after a CUD operation will always be slower. 
 
 ## Usage
 
