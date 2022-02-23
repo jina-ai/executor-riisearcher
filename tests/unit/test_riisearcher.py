@@ -33,21 +33,21 @@ def test_config():
 
 def test_empty_train(rii_index):
     da = DocumentArray()
-    rii_index.index(da)
+    rii_index.index(da, parameters={})
 
 
 def test_empty_index(rii_index):
     da = DocumentArray()
-    rii_index.index(da)
+    rii_index.index(da, parameters={})
 
 
 def test_empty_search(rii_index):
     da = DocumentArray()
-    rii_index.search(da)
+    rii_index.search(da, parameters={})
 
 
 def test_search_input_none(rii_index):
-    rii_index.search(None)
+    rii_index.search(None, parameters={})
 
 
 def test_train(tmp_path, rii_index):
@@ -72,7 +72,7 @@ def test_train_and_index(tmp_path):
         [Document(embedding=np.random.random(_DIM)) for _ in range(1024)]
     )
     rii_index = RiiSearcher(model_path=str(tmp_path))
-    rii_index.index(da_index, {})
+    rii_index.index(da_index, parameters={})
     assert len(rii_index._doc_ids) == 1024
     assert rii_index._rii_index.N == 1024
 
@@ -81,11 +81,11 @@ def test_rii_search(trained_index, tmp_path):
     indexer = RiiSearcher(model_path=str(tmp_path))
     vec = np.array(np.random.random([1024, 10]), dtype=np.float32)
     index_docs = _get_docs_from_vecs(vec)
-    indexer.index(index_docs)
+    indexer.index(index_docs, parameters={})
 
     vec = np.array(np.random.random([10, 10]), dtype=np.float32)
     query_docs = _get_docs_from_vecs(vec)
-    indexer.search(query_docs)
+    indexer.search(query_docs, parameters={})
 
     for q in query_docs:
         assert q.matches[0].scores['euclidean'].value < 10
@@ -96,7 +96,7 @@ def test_save(trained_index, tmp_path):
         [Document(embedding=np.random.random(_DIM)) for _ in range(1024)]
     )
     rii_index = RiiSearcher(model_path=str(tmp_path))
-    rii_index.index(da, {})
+    rii_index.index(da, parameters={})
     rii_index.save(parameters={'model_path': str(tmp_path)})
 
     assert (tmp_path / DOC_IDS_FILENAME).is_file()
@@ -115,7 +115,7 @@ def test_reconfigure(saved_rii, tmp_path):
 
     vec = np.array(np.random.random([10, 10]), dtype=np.float32)
     query_docs = _get_docs_from_vecs(vec)
-    rii_index.search(query_docs)
+    rii_index.search(query_docs, parameters={})
     assert not rii_index._needs_reconfigure
 
     for q in query_docs:
