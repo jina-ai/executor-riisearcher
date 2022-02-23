@@ -36,9 +36,8 @@ def test_search_flow(tmp_path, saved_rii):
         result = f.post(
             on='/search',
             inputs=query_docs,
-            return_results=True,
             parameters={'top_k': 4},
-        )[0].docs
+        )
         assert len(result[0].matches) == 4
         for d in result:
             assert (

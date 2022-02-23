@@ -5,7 +5,8 @@ from typing import Dict, Tuple, Optional, List
 import nanopq
 import numpy as np
 import rii
-from jina import Executor, DocumentArray, requests, Document
+from docarray import DocumentArray, Document
+from jina import Executor, requests
 from jina.logging.logger import JinaLogger
 
 DOC_IDS_FILENAME = "doc_ids.bin"
@@ -15,7 +16,7 @@ RII_INDEX_FILENAME = "rii.pkl"
 class RiiSearcher(Executor):
     """
     Rii-powered vector indexer and searcher
-    or more information about the Rii
+    For more information about the Rii
     supported parameters and installation problems, please consult:
         - https://github.com/matsui528/rii
     """
@@ -29,7 +30,7 @@ class RiiSearcher(Executor):
         iter: int = 5,
         default_top_k: int = 5,
         model_path: Optional[str] = None,
-        traversal_paths: Tuple[str] = ('r',),
+        traversal_paths: str = '@r',
         is_verbose: bool = False,
         *args,
         **kwargs,
@@ -49,7 +50,7 @@ class RiiSearcher(Executor):
                 be saved as `rii.pkl`.
         training points to training data from `train_filepath`.
             The points will be selected randomly from the available points
-        :param traversal_paths: traverse path on docs, e.g. ['r'], ['c']
+        :param traversal_paths: traverse path on docs, e.g. '@r', '@c'
         :param default_top_k: get tok k vectors
         :param is_verbose: set to True for verbose output from Rii
         """
@@ -101,8 +102,7 @@ class RiiSearcher(Executor):
                 'No `model_path` provided, train offline and build the indexer from scratch!'
             )
 
-    def _add_to_index(
-        self, vectors: "np.ndarray", ids: List):
+    def _add_to_index(self, vectors: "np.ndarray", ids: List):
         if self._rii_index is None or not self._is_trained:
             self.logger.warning('Please train the indexer first before indexing data')
             return
@@ -117,7 +117,7 @@ class RiiSearcher(Executor):
         saves the trained Rii Searcher to be re-used and does not contain any
         indexed data. The embedding data distribution should be same as the data
         embedding to be indexed
-        Please do not use this with flow
+        Note: Please do not use this with flow
 
         :param data: A numpy array with data to train
         :param parameters: Dictionary with optional parameters to override
@@ -144,19 +144,19 @@ class RiiSearcher(Executor):
             pickle.dump(rii_index, f)
 
     @requests(on='/index')
-    def index(self, docs: DocumentArray, parameters: Dict = {}, **kwargs):
+    def index(self, docs: DocumentArray, parameters: Dict, **kwargs):
         """Index the Documents' embeddings.
         :param docs: Documents whose `embedding` to index.
-        :param parameters: Dictionary with optional parameters that can be used to
+        :param parameters: Dictionary with parameters that can be used to
             override the parameters set at initialization. The only supported key is
             `traversal_paths`, `cluster_center`, 'iter'.
         """
         traversal_paths = parameters.get('traversal_paths', self.traversal_paths)
-        flat_docs = docs.traverse_flat(traversal_paths)
+        flat_docs = docs[traversal_paths]
         if len(flat_docs) == 0:
             return
 
-        ids = flat_docs.get_attributes('id')
+        ids = flat_docs[:, 'id']
         embeddings = np.stack(flat_docs.embeddings).astype(np.float32)
 
         self._add_to_index(embeddings, ids)
@@ -165,7 +165,7 @@ class RiiSearcher(Executor):
     def search(
         self,
         docs: DocumentArray,
-        parameters: Optional[Dict] = {},
+        parameters: Dict,
         *args,
         **kwargs,
     ):
@@ -177,7 +177,7 @@ class RiiSearcher(Executor):
 
         :param docs: An array of `Documents` that should have the `embedding` property
             of the same dimension as vectors in the index
-        :param parameters: Dictionary with optional parameters that can be used to
+        :param parameters: Dictionary with parameters that can be used to
             override the parameters set at initialization. Supported keys are
             `traversal_paths`, `top_k`, `candidates`, and `target_ids`.
         """
@@ -199,7 +199,7 @@ class RiiSearcher(Executor):
         top_k = int(parameters.get("top_k", self.default_top_k))
         candidates = parameters.get("candidates", self.candidates)
 
-        for doc in docs.traverse_flat(traversal_paths):
+        for doc in docs[traversal_paths]:
             indices, dists = self._rii_index.query(
                 q=doc.embedding,
                 L=candidates,
@@ -208,15 +208,15 @@ class RiiSearcher(Executor):
             )
             for idx, dist in zip(indices, dists):
                 match = Document(id=self._doc_ids[idx])
-                match.scores[self.metric] = dist
+                match.scores[self.metric].value = dist
                 doc.matches.append(match)
 
     @requests(on='/save')
-    def save(self, parameters: Dict = {}, **kwargs):
+    def save(self, parameters: Dict, **kwargs):
         """
         Save a snapshot of the current indexer along with the indexed `Document` ids
 
-        :param parameters: Dictionary with optional parameters to override
+        :param parameters: Dictionary with parameters to override
         default parameters set at initialization. The only supported key is
             `model_path`.
         """
