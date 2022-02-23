@@ -26,7 +26,7 @@ def test_search_flow(tmp_path, saved_rii):
     vec = np.array(np.random.random([512, 10]), dtype=np.float32)
     query_docs = _get_docs_from_vecs(vec)
 
-    f = Flow(return_response=True).add(
+    f = Flow().add(
         uses=RiiSearcher,
         uses_with={'model_path': str(tmp_path)},
         timeout_ready=-1,
@@ -37,7 +37,7 @@ def test_search_flow(tmp_path, saved_rii):
             on='/search',
             inputs=query_docs,
             parameters={'top_k': 4},
-        )[0].docs
+        )
         assert len(result[0].matches) == 4
         for d in result:
             assert (
